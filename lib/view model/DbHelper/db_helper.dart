@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:connectivity/connectivity.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:sqflite/sqflite.dart';
@@ -13,7 +15,9 @@ class DbHelper
     {
       return _db;
     }
-    var directory=await getExternalStorageDirectory();
+    final directory = Platform.isAndroid
+        ? await getExternalStorageDirectory()
+        : await getApplicationSupportDirectory();
     String path=join(directory!.path,'db');
     var db=await openDatabase(path,version: 1,onCreate: (db, version) {
       db.execute("CREATE TABLE Tasks(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time,periority TEXT,show TEXT,progress TEXT,status,TEXT)");
