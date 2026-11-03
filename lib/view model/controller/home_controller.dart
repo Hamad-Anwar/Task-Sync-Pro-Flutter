@@ -1,4 +1,6 @@
-import 'package:connectivity/connectivity.dart';
+import 'dart:async';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:get/get.dart';
@@ -13,7 +15,7 @@ import '../../model/task_filter.dart';
 import '../../model/task_model.dart';
 import '../../model/task_status.dart';
 
-class HomeController extends GetxController {
+class HomeController extends GetxController with WidgetsBindingObserver {
   RxMap userData = {}.obs;
   RxString name = ''.obs;
   RxBool focus = false.obs;
@@ -21,7 +23,16 @@ class HomeController extends GetxController {
   RxInt taskCount = 0.obs;
   RxBool hasData = false.obs;
   final DbHelper db = DbHelper();
-  late final TaskSync sync = TaskSync(db, FirebaseTaskRemote());
+  // retryBase liga o reenvio automático com backoff quando o envio falha
+  late final TaskSync sync = TaskSync(db, FirebaseTaskRemote(),
+      retryBase: const Duration(seconds: 5),
+      logger: (message) => debugPrint('[TaskSync] $message'));
+  // estado de sincronização, para a UI mostrar "pendente"/"falhou" se quiser
+  RxInt pendingCount = 0.obs;
+  RxBool syncFailed = false.obs;
+  final List<StreamSubscription<dynamic>> _subs = [];
+  // eventos remotos são aplicados um por vez, na ordem em que chegaram
+  Future<void> _remoteChain = Future.value();
   RxList list = [].obs;
   Connectivity? connectivity;
   final searchController = TextEditingController().obs;
@@ -30,51 +41,104 @@ class HomeController extends GetxController {
   RxString statusFilter = 'All'.obs;
   // espelho reativo do texto de busca (TextEditingController não é reativo p/ Obx)
   RxString searchQuery = ''.obs;
-  HomeController() {
-    // if name not loaded
-    if (userData['NAME'] == null) {
-      getUserData();
+  // Os efeitos colaterais ficam em onInit (e não no construtor): os widgets
+  // fazem `Get.put(HomeController())`, e o Dart executa o construtor ANTES do
+  // put, mesmo quando já existe uma instância registrada. No construtor, cada
+  // chamada deixaria listeners e um TaskSync órfãos rodando em paralelo.
+  // onInit só roda na instância que o Get realmente registra.
+  @override
+  void onInit() {
+    super.onInit();
+    WidgetsBinding.instance.addObserver(this);
+    getUserData();
+    _startSync();
+    getTaskData();
+  }
+
+  /// Ao voltar para o app, tenta enviar o que ficou pendente: timers e
+  /// listeners de rede nem sempre rodam enquanto o app está em segundo plano.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) syncPending();
+  }
+
+  @override
+  void onClose() {
+    WidgetsBinding.instance.removeObserver(this);
+    for (final sub in _subs) {
+      sub.cancel();
     }
-    // check for set listeners only for one time
-    if (connectivity == null) {
-      String str = FirebaseService.auth.currentUser!.email.toString();
-      String node = FirebaseService.nodeFromEmail(str);
-      // listener for changing live database: traz o que ainda não existe local
-      FirebaseDatabase.instance
-          .ref('Tasks')
-          .child(node)
-          .onValue
-          .listen((event) async {
-        for (var element in event.snapshot.children) {
-          final task = _taskFromSnapshot(element);
-          if (!await db.isRowExists(task.key!, 'Tasks')) {
-            await db.saveFromRemote(task);
+    _subs.clear();
+    sync.dispose();
+    super.onClose();
+  }
+
+  Future<void> _startSync() async {
+    try {
+      final user = FirebaseService.auth.currentUser;
+      if (user == null) {
+        // sessão do Firebase perdida: o app segue funcionando local e a fila
+        // espera o próximo login, em vez de quebrar na abertura
+        debugPrint('Sem usuário autenticado: sync remoto desligado');
+        return;
+      }
+      await _migrateToUidNode(user.uid);
+      if (isClosed)
+        return; // fechou enquanto migrava: não deixa listeners órfãos
+      final tasksRef = FirebaseDatabase.instance.ref('Tasks').child(user.uid);
+
+      // traz do Firebase o que mudou em outro aparelho (inclusive enquanto o
+      // app estava fechado); alteração local ainda não enviada sempre ganha
+      _subs.add(tasksRef.onValue.listen((event) {
+        _enqueueRemote(() async {
+          for (final element in event.snapshot.children) {
+            await db.saveFromRemote(_taskFromSnapshot(element));
           }
-        }
-        getTaskData();
-      });
+          getTaskData();
+        });
+      }, onError: _onRemoteError));
 
       // o snapshot do evento é a própria task alterada (não a lista)
-      FirebaseDatabase.instance
-          .ref('Tasks')
-          .child(node)
-          .onChildChanged
-          .listen((event) async {
-        await db.saveFromRemote(_taskFromSnapshot(event.snapshot));
-        getTaskData();
-      });
+      _subs.add(tasksRef.onChildChanged.listen((event) {
+        _enqueueRemote(() async {
+          await db.saveFromRemote(_taskFromSnapshot(event.snapshot));
+          getTaskData();
+        });
+      }, onError: _onRemoteError));
+
       connectivity = Connectivity();
       // listener for internet state
-      connectivity!.onConnectivityChanged.listen((event) {
-        if (event == ConnectivityResult.mobile ||
-            event == ConnectivityResult.wifi) {
-          syncPending();
-        }
-      });
+      _subs.add(connectivity!.onConnectivityChanged.listen((results) {
+        // connectivity_plus devolve a lista de conexões ativas (ex.: wifi + vpn)
+        if (results.any((r) => r != ConnectivityResult.none)) syncPending();
+      }));
       // o que ficou pendente de uma sessão anterior sobe já na abertura
       syncPending();
+    } catch (e) {
+      debugPrint('Sync remoto não iniciado: $e');
     }
-    getTaskData();
+  }
+
+  /// As tasks ficavam em `Tasks/<parte-do-email>` (nó compartilhável entre
+  /// contas com o mesmo prefixo). Agora ficam em `Tasks/<uid>`. Na primeira
+  /// vez neste aparelho, tudo que existe local é recolocado na fila para subir
+  /// ao novo nó; as tasks nunca ficam só no nó antigo.
+  Future<void> _migrateToUidNode(String uid) async {
+    if (await UserPref.isNodeMigrated(uid)) return;
+    await db.requeueAll();
+    await UserPref.markNodeMigrated(uid);
+  }
+
+  void _enqueueRemote(Future<void> Function() job) {
+    _remoteChain = _remoteChain.then((_) => job()).catchError((Object e) {
+      debugPrint('Evento remoto ignorado: $e');
+    });
+  }
+
+  void _onRemoteError(Object error) {
+    // ex.: permission-denied encerra o stream; local + fila seguem intactos
+    debugPrint('Listener do Firebase falhou: $error');
+    if (!isClosed) syncFailed.value = true;
   }
 
   static TaskModel _taskFromSnapshot(DataSnapshot snapshot) {
@@ -90,12 +154,24 @@ class HomeController extends GetxController {
         category: field('category'),
         title: field('title'),
         image: field('image'),
-        show: field('show'));
+        show: field('show'),
+        updatedAt: field('updatedAt'));
   }
 
   /// Envia a fila local (criações, mudanças de status e remoções feitas
   /// offline). Itens só saem da fila depois que o Firebase confirmou.
-  Future<bool> syncPending() => sync.run();
+  /// Falha "de verdade" para o usuário: erro que esperar não resolve, ou
+  /// 3 tentativas seguidas sem sucesso. Antes disso é só "aguardando envio"
+  /// (ex.: sem rede), que a nova tentativa automática resolve sozinha.
+  bool get _hardFailure =>
+      sync.lastErrorLooksPermanent || sync.consecutiveFailures >= 3;
+
+  Future<bool> syncPending() async {
+    final ok = await sync.run();
+    await refreshPending();
+    if (!isClosed) syncFailed.value = !ok && _hardFailure;
+    return ok;
+  }
 
   checkData() {
     int count = 0;
@@ -152,6 +228,18 @@ class HomeController extends GetxController {
     // pendentes também já estão em Tasks: a fila não entra na lista
     list.value = await db.getData();
     checkData();
+    refreshPending();
+  }
+
+  /// Atualiza o contador de pendentes logo que algo muda no banco local, sem
+  /// esperar o envio terminar (senão o aviso só apareceria depois da falha).
+  Future<void> refreshPending() async {
+    try {
+      final pending = await db.pendingCount();
+      if (!isClosed) pendingCount.value = pending;
+    } catch (e) {
+      debugPrint('Contagem de pendentes indisponível: $e');
+    }
   }
 
   Future<List<TaskModel>> getFututeData() {

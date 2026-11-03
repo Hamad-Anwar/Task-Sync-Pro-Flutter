@@ -57,6 +57,12 @@ class FakeRemote implements TaskRemote {
   }
 }
 
+class ThrowingStore extends FakeStore {
+  @override
+  Future<List<TaskModel>> getPendingUploads() async =>
+      throw StateError('banco local indisponível');
+}
+
 void main() {
   late FakeStore store;
   late FakeRemote remote;
@@ -85,7 +91,9 @@ void main() {
     remote.failOn = {'1'};
 
     expect(await sync.run(), isFalse);
-    expect(store.uploads.keys, containsAll(['1', '2']));
+    // a que falhou continua pendente; a outra não fica refém dela
+    expect(store.uploads.keys, ['1']);
+    expect(remote.pushed, ['2']);
 
     remote.failOn = {};
     expect(await sync.run(), isTrue);
@@ -100,7 +108,7 @@ void main() {
     expect(store.uploads.keys, ['1']);
   });
 
-  test('task alterada durante o envio continua na fila', () async {
+  test('task alterada durante o envio é reenviada na mesma execução', () async {
     store.uploads['1'] = makeTask('1');
     remote.gate = Completer<void>();
     sync = TaskSync(store, remote);
@@ -111,7 +119,8 @@ void main() {
     remote.gate!.complete();
 
     expect(await running, isTrue);
-    expect(store.uploads['1']!.status, 'complete');
+    expect(remote.pushed, ['1', '1']);
+    expect(store.uploads, isEmpty);
   });
 
   test('chamadas simultâneas não enviam duas vezes', () async {
@@ -125,5 +134,69 @@ void main() {
     await Future.wait([a, b]);
 
     expect(remote.pushed, ['1']);
+  });
+
+  test('task nova pedida durante uma execução não fica esquecida', () async {
+    store.uploads['1'] = makeTask('1');
+    remote.gate = Completer<void>();
+    sync = TaskSync(store, remote);
+
+    final a = sync.run();
+    await Future<void>.delayed(Duration.zero);
+    store.uploads['2'] = makeTask('2');
+    final b = sync.run();
+    remote.gate!.complete();
+
+    expect(await a, isTrue);
+    expect(await b, isTrue);
+    expect(remote.pushed, containsAll(['1', '2']));
+    expect(store.uploads, isEmpty);
+  });
+
+  test('task com erro não trava as outras da fila', () async {
+    store.uploads['1'] = makeTask('1');
+    store.uploads['2'] = makeTask('2');
+    store.uploads['3'] = makeTask('3');
+    remote.failOn = {'1'};
+
+    expect(await sync.run(), isFalse);
+    expect(remote.pushed, ['2', '3']);
+    expect(store.uploads.keys, ['1']);
+  });
+
+  test('erro ao ler a fila local não estoura exceção', () async {
+    sync = TaskSync(ThrowingStore(), remote);
+
+    expect(await sync.run(), isFalse);
+    expect(sync.lastError, isNotNull);
+  });
+
+  test('falha agenda nova tentativa sozinha e para quando dá certo', () async {
+    store.uploads['1'] = makeTask('1');
+    remote.failOn = {'1'};
+    sync = TaskSync(store, remote,
+        retryBase: const Duration(milliseconds: 10),
+        retryMax: const Duration(milliseconds: 40));
+
+    expect(await sync.run(), isFalse);
+    expect(sync.consecutiveFailures, 1);
+
+    remote.failOn = {};
+    await Future<void>.delayed(const Duration(milliseconds: 150));
+    expect(store.uploads, isEmpty);
+    expect(sync.consecutiveFailures, 0);
+    sync.dispose();
+  });
+
+  test('dispose cancela a nova tentativa agendada', () async {
+    store.uploads['1'] = makeTask('1');
+    remote.failOn = {'1'};
+    sync = TaskSync(store, remote, retryBase: const Duration(milliseconds: 10));
+
+    expect(await sync.run(), isFalse);
+    sync.dispose();
+    remote.failOn = {};
+    await Future<void>.delayed(const Duration(milliseconds: 80));
+    expect(store.uploads.keys, ['1']);
   });
 }

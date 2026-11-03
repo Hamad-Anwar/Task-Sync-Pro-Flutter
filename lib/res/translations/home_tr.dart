@@ -11,6 +11,8 @@ const Map<String, String> homeEn = {
   'home_update_status': 'Change status',
   'home_delete': 'Delete',
   'home_days_left': '@days Days Left',
+  'sync_pending': 'Changes to send: @count',
+  'sync_failed': 'Sync failed. Tap to try again',
 };
 
 const Map<String, String> homePt = {
@@ -25,4 +27,6 @@ const Map<String, String> homePt = {
   'home_update_status': 'Alterar status',
   'home_delete': 'Excluir',
   'home_days_left': '@days dias restantes',
+  'sync_pending': 'Alterações a enviar: @count',
+  'sync_failed': 'Falha ao sincronizar. Toque para tentar de novo',
 };

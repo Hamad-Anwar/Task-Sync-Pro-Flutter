@@ -17,35 +17,90 @@ class DbHelper implements TaskLocalStore {
   // compartilhado: Home e AddTask criam instâncias próprias do helper
   static Database? _db;
 
+  // abertura em andamento: chamadas simultâneas (listeners, sync, UI) esperam
+  // a mesma abertura em vez de abrir e "recuperar" a fila várias vezes
+  static Future<Database>? _opening;
+
   Future<Database?> get db async {
-    if (_db != null) {
-      return _db;
-    }
-    final directory = Platform.isAndroid
-        ? await getExternalStorageDirectory()
-        : await getApplicationSupportDirectory();
-    String path = join(directory!.path, 'db');
-    _db = await openDatabase(path, version: 1, onCreate: (db, version) async {
-      await createSchema(db);
-    });
-    await _recoverPendingUploads(_db!);
-    return _db;
+    final existing = _db;
+    if (existing != null) return existing;
+    return _opening ??= _open();
   }
 
+  static Future<Database> _open() async {
+    try {
+      // Android grava no armazenamento externo do app; ele pode não existir
+      // (null) — nesse caso cai para o diretório interno em vez de quebrar
+      final Directory directory =
+          (Platform.isAndroid ? await getExternalStorageDirectory() : null) ??
+              await getApplicationSupportDirectory();
+      final database = await openDatabase(join(directory.path, 'db'),
+          version: schemaVersion, onCreate: (db, version) async {
+        await createSchema(db);
+      }, onUpgrade: upgradeSchema);
+      await _recoverPendingUploads(database);
+      _db = database;
+      return database;
+    } finally {
+      _opening =
+          null; // falha na abertura não fica "presa": próxima chamada tenta de novo
+    }
+  }
+
+  /// v1: tabelas originais. v2: coluna `updatedAt` (resolução de conflito).
+  static const int schemaVersion = 2;
+
+  static const List<String> _tables = [
+    'Tasks',
+    'PendingUploads',
+    'PendingDeletes'
+  ];
+
+  // Colunas sempre nomeadas nos INSERT ... SELECT: bancos criados pela v1 têm
+  // uma coluna extra "TEXT" (typo antigo em `status,TEXT`) e a ordem física
+  // das colunas difere entre bancos novos e migrados.
+  static const String _columns =
+      'key,title,category,description,image,date,time,periority,show,progress,status,updatedAt';
+
   static Future<void> createSchema(Database db) async {
-    await db.execute(
-        "CREATE TABLE Tasks(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time,periority TEXT,show TEXT,progress TEXT,status,TEXT)");
-    await db.execute(
-        "CREATE TABLE PendingUploads(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time,periority TEXT,show TEXT,progress TEXT,status,TEXT)");
-    await db.execute(
-        "CREATE TABLE PendingDeletes(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time,periority TEXT,show TEXT,progress TEXT,status,TEXT)");
+    for (final table in _tables) {
+      await db.execute(
+          'CREATE TABLE $table(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time TEXT,periority TEXT,show TEXT,progress TEXT,status TEXT,updatedAt TEXT)');
+    }
+  }
+
+  /// Migra bancos existentes sem apagar nada: só acrescenta a coluna nova.
+  static Future<void> upgradeSchema(
+      Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      for (final table in _tables) {
+        await db.execute('ALTER TABLE $table ADD COLUMN updatedAt TEXT');
+      }
+    }
   }
 
   /// Versões antigas guardavam a task criada offline SÓ em PendingUploads.
   /// Copia para Tasks o que estiver só na fila, para a lista não depender dela.
   static Future<void> _recoverPendingUploads(Database db) async {
-    await db
-        .execute('INSERT OR IGNORE INTO Tasks SELECT * FROM PendingUploads');
+    await db.execute(
+        'INSERT OR IGNORE INTO Tasks($_columns) SELECT $_columns FROM PendingUploads');
+  }
+
+  /// Recoloca todas as tasks locais na fila de envio. Usado na migração para o
+  /// nó por usuário (uid): o que só existia no nó antigo do Firebase sobe de novo.
+  Future<void> requeueAll() async {
+    var dbClient = await db;
+    await dbClient!.execute(
+        'INSERT OR REPLACE INTO PendingUploads($_columns) SELECT $_columns FROM Tasks');
+  }
+
+  // Carimbo estritamente crescente: duas edições no mesmo milissegundo (ou
+  // relógio que andou para trás) não empatam nem invertem a ordem local.
+  static int _lastStamp = 0;
+  static String _nextStamp() {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    _lastStamp = now > _lastStamp ? now : _lastStamp + 1;
+    return _lastStamp.toString();
   }
 
   /// Testes: usa um banco já aberto (ex.: sqflite_common_ffi em memória).
@@ -74,6 +129,7 @@ class DbHelper implements TaskLocalStore {
   }
 
   Future<void> _saveAndEnqueue(TaskModel model) async {
+    model.updatedAt = _nextStamp();
     var dbClient = await db;
     await dbClient!.transaction((txn) async {
       await txn.insert('Tasks', model.toMap(),
@@ -83,12 +139,21 @@ class DbHelper implements TaskLocalStore {
     });
   }
 
-  /// Task que veio do Firebase: grava só local, sem reenfileirar. Se houver
-  /// alteração local ainda não enviada, ela ganha (não sobrescreve).
+  /// Task que veio do Firebase: grava só local, sem reenfileirar.
+  /// * Alteração local ainda não enviada sempre ganha.
+  /// * Se a cópia local já enviada é mais nova que a remota (`updatedAt`), a
+  ///   remota é ignorada — dado velho não regride o que o usuário já fez.
+  /// Retorna true se gravou.
   Future<bool> saveFromRemote(TaskModel model) async {
     var dbClient = await db;
     if (await isRowExists(model.key!, 'PendingUploads')) return false;
-    await dbClient!.insert('Tasks', model.toMap(),
+    final rows = await dbClient!
+        .query('Tasks', where: 'key = ?', whereArgs: [model.key!]);
+    if (rows.isNotEmpty &&
+        TaskModel.fromMap(rows.first).updatedAtMillis > model.updatedAtMillis) {
+      return false;
+    }
+    await dbClient.insert('Tasks', model.toMap(),
         conflictAlgorithm: ConflictAlgorithm.replace);
     return true;
   }
@@ -142,6 +207,18 @@ class DbHelper implements TaskLocalStore {
   @override
   Future<void> removePendingDelete(String key) async {
     await delete(key, 'PendingDeletes');
+  }
+
+  /// Quantas alterações ainda não chegaram ao Firebase.
+  Future<int> pendingCount() async {
+    final dbClient = await db;
+    final uploads = Sqflite.firstIntValue(
+            await dbClient!.rawQuery('SELECT COUNT(*) FROM PendingUploads')) ??
+        0;
+    final deletes = Sqflite.firstIntValue(
+            await dbClient.rawQuery('SELECT COUNT(*) FROM PendingDeletes')) ??
+        0;
+    return uploads + deletes;
   }
 
   Future<bool> isRowExists(String id, String table) async {

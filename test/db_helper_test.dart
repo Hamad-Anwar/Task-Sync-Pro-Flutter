@@ -3,7 +3,8 @@ import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:to_do_app/model/task_model.dart';
 import 'package:to_do_app/view%20model/DbHelper/db_helper.dart';
 
-TaskModel makeTask(String key, {String status = 'todo', String show = 'yes'}) =>
+TaskModel makeTask(String key,
+        {String status = 'todo', String show = 'yes', String? updatedAt}) =>
     TaskModel(
       key: key,
       title: 'Task $key',
@@ -16,6 +17,7 @@ TaskModel makeTask(String key, {String status = 'todo', String show = 'yes'}) =>
       show: show,
       progress: '0',
       status: status,
+      updatedAt: updatedAt,
     );
 
 void main() {
@@ -69,7 +71,8 @@ void main() {
     await db.removePendingUpload(sent);
     expect((await db.getPendingUploads()).single.status, 'complete');
 
-    await db.removePendingUpload(makeTask('1', status: 'complete'));
+    final current = (await db.getPendingUploads()).single;
+    await db.removePendingUpload(current);
     expect(await db.getPendingUploads(), isEmpty);
     expect((await db.getData()).single.status, 'complete');
   });
@@ -90,5 +93,85 @@ void main() {
     await DbHelper.useDatabase(database);
 
     expect((await db.getData()).map((t) => t.key), ['old']);
+  });
+
+  test('pendingCount reflete a fila e zera quando tudo é enviado', () async {
+    expect(await db.pendingCount(), 0);
+
+    final sent = makeTask('1');
+    await db.insert(sent);
+    await db.insert(makeTask('2'));
+    expect(await db.pendingCount(), 2);
+
+    await db.removePendingUpload(sent);
+    expect(await db.pendingCount(), 1);
+  });
+
+  test('toda edição local recebe um updatedAt maior que o anterior', () async {
+    await db.insert(makeTask('1'));
+    final first = (await db.getData()).single.updatedAtMillis;
+    await db.update(makeTask('1', status: 'complete'));
+    final second = (await db.getData()).single.updatedAtMillis;
+
+    expect(first, greaterThan(0));
+    expect(second, greaterThan(first));
+    expect((await db.getPendingUploads()).single.updatedAtMillis, second);
+  });
+
+  test('remoto mais antigo não regride uma task já enviada', () async {
+    await db.insert(makeTask('1', status: 'complete'));
+    await db.removePendingUpload((await db.getPendingUploads()).single);
+    final local = (await db.getData()).single.updatedAtMillis;
+
+    final stale = makeTask('1', updatedAt: '${local - 1}');
+    expect(await db.saveFromRemote(stale), isFalse);
+    expect((await db.getData()).single.status, 'complete');
+
+    final newer = makeTask('1', updatedAt: '${local + 1}');
+    expect(await db.saveFromRemote(newer), isTrue);
+    expect((await db.getData()).single.status, 'todo');
+  });
+
+  test('remoto sem updatedAt (versão antiga) ainda entra se não há local',
+      () async {
+    expect(await db.saveFromRemote(makeTask('9')), isTrue);
+    expect((await db.getData()).single.key, '9');
+  });
+
+  test('requeueAll recoloca tudo na fila (migração para nó por uid)', () async {
+    await db.saveFromRemote(makeTask('1', updatedAt: '10'));
+    await db.saveFromRemote(makeTask('2', updatedAt: '20'));
+    expect(await db.getPendingUploads(), isEmpty);
+
+    await db.requeueAll();
+
+    expect(
+        (await db.getPendingUploads()).map((t) => t.key).toSet(), {'1', '2'});
+    expect(await db.getData(), hasLength(2));
+  });
+
+  test('migração v1 -> v2 preserva tasks e acrescenta updatedAt', () async {
+    final legacy = await databaseFactoryFfi.openDatabase(inMemoryDatabasePath,
+        options: OpenDatabaseOptions(singleInstance: false));
+    for (final table in ['Tasks', 'PendingUploads', 'PendingDeletes']) {
+      // schema original da v1, com o typo `status,TEXT`
+      await legacy.execute(
+          'CREATE TABLE $table(key TEXT PRIMARY KEY,title TEXT,category TEXT,description TEXT,image TEXT,date TEXT,time,periority TEXT,show TEXT,progress TEXT,status,TEXT)');
+    }
+    await legacy
+        .insert('Tasks', {'key': 'old', 'title': 'antiga', 'status': 'todo'});
+    await legacy.insert('PendingUploads', {'key': 'off', 'title': 'offline'});
+
+    await DbHelper.upgradeSchema(legacy, 1, DbHelper.schemaVersion);
+    await DbHelper.useDatabase(legacy);
+
+    final all = await db.getData();
+    expect(all.map((t) => t.key).toSet(), {'old', 'off'});
+    expect(all.every((t) => t.updatedAtMillis == 0), isTrue);
+
+    await db.update(makeTask('old', status: 'complete'));
+    expect((await db.getPendingUploads()).map((t) => t.key).toSet(),
+        {'off', 'old'});
+    await legacy.close();
   });
 }
