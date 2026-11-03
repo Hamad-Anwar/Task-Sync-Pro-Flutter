@@ -26,6 +26,18 @@ class FirebaseService {
     return local.replaceAll(RegExp(r'[.#$\[\]]'), '_');
   }
 
+  /// Snackbar padrão das falhas do Firebase: título "Error", mensagem sem o
+  /// prefixo [plugin/codigo] e ícone de alerta vermelho.
+  static void showFirebaseError(Object? error) {
+    Utils.showSnackBar(
+        'Error',
+        Utils.extractFirebaseError(error.toString()),
+        const Icon(
+          FontAwesomeIcons.triangleExclamation,
+          color: Colors.red,
+        ));
+  }
+
   /// Grava a task inteira no Firebase. Completa só quando o servidor
   /// confirmou e propaga o erro — quem chama decide se tira da fila.
   static Future<void> insertData(TaskModel model) {
@@ -77,33 +89,15 @@ class FirebaseService {
           Get.to(HomePage());
           signUpController.setLoading(false);
         }).onError((error, stackTrace) {
-          Utils.showSnackBar(
-              'Error',
-              Utils.extractFirebaseError(error.toString()),
-              const Icon(
-                FontAwesomeIcons.triangleExclamation,
-                color: Colors.red,
-              ));
+          showFirebaseError(error);
           signUpController.setLoading(false);
         });
       }).onError((error, stackTrace) {
-        Utils.showSnackBar(
-            'Error',
-            Utils.extractFirebaseError(error.toString()),
-            const Icon(
-              FontAwesomeIcons.triangleExclamation,
-              color: Colors.red,
-            ));
+        showFirebaseError(error);
         signUpController.setLoading(false);
       });
     } catch (e) {
-      Utils.showSnackBar(
-          'Error',
-          Utils.extractFirebaseError(e.toString()),
-          const Icon(
-            FontAwesomeIcons.triangleExclamation,
-            color: Colors.red,
-          ));
+      showFirebaseError(e);
       signUpController.setLoading(true);
     }
   }
@@ -136,33 +130,15 @@ class FirebaseService {
           Get.to(HomePage());
           signInController.setLoading(false);
         }).onError((error, stackTrace) {
-          Utils.showSnackBar(
-              'Error',
-              Utils.extractFirebaseError(error.toString()),
-              const Icon(
-                FontAwesomeIcons.triangleExclamation,
-                color: Colors.red,
-              ));
+          showFirebaseError(error);
           signInController.setLoading(false);
         });
       }).onError((error, stackTrace) {
-        Utils.showSnackBar(
-            'Error',
-            Utils.extractFirebaseError(error.toString()),
-            const Icon(
-              FontAwesomeIcons.triangleExclamation,
-              color: Colors.red,
-            ));
+        showFirebaseError(error);
         signInController.setLoading(false);
       });
     } catch (e) {
-      Utils.showSnackBar(
-          'Error',
-          Utils.extractFirebaseError(e.toString()),
-          const Icon(
-            FontAwesomeIcons.triangleExclamation,
-            color: Colors.red,
-          ));
+      showFirebaseError(e);
       signInController.setLoading(true);
     }
   }
@@ -200,44 +176,20 @@ class FirebaseService {
               UserPref.setUser(value.user!.displayName!, value.user!.email!,
                   "NOPASSWORD", node, value.user!.uid);
             }).onError((error, stackTrace) {
-              Utils.showSnackBar(
-                  'Error',
-                  Utils.extractFirebaseError(error.toString()),
-                  const Icon(
-                    FontAwesomeIcons.triangleExclamation,
-                    color: Colors.red,
-                  ));
+              showFirebaseError(error);
               return;
             });
           }).onError((error, stackTrace) {
-            Utils.showSnackBar(
-                'Error',
-                Utils.extractFirebaseError(error.toString()),
-                const Icon(
-                  FontAwesomeIcons.triangleExclamation,
-                  color: Colors.red,
-                ));
+            showFirebaseError(error);
             return;
           });
         }
       }).onError((error, stackTrace) {
-        Utils.showSnackBar(
-            'Error',
-            Utils.extractFirebaseError(error.toString()),
-            const Icon(
-              FontAwesomeIcons.triangleExclamation,
-              color: Colors.red,
-            ));
+        showFirebaseError(error);
         return;
       });
     } catch (e) {
-      Utils.showSnackBar(
-          'Error',
-          Utils.extractFirebaseError(e.toString()),
-          const Icon(
-            FontAwesomeIcons.triangleExclamation,
-            color: Colors.red,
-          ));
+      showFirebaseError(e);
     }
   }
 
