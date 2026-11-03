@@ -110,7 +110,9 @@ class FirebaseService {
     return (user.email ?? '').split('@').first;
   }
 
-  static void _showError(Object error) {
+  /// Snackbar padrão das falhas do Firebase: título "Error", mensagem sem o
+  /// prefixo [plugin/codigo] e ícone de alerta vermelho.
+  static void showFirebaseError(Object? error) {
     Utils.showSnackBar(
         'Error',
         Utils.extractFirebaseError(error.toString()),
@@ -142,7 +144,7 @@ class FirebaseService {
           ));
       Get.to(HomePage());
     } catch (e) {
-      _showError(e);
+      showFirebaseError(e);
     } finally {
       signUpController.setLoading(false);
     }
@@ -169,7 +171,7 @@ class FirebaseService {
           ));
       Get.to(HomePage());
     } catch (e) {
-      _showError(e);
+      showFirebaseError(e);
     } finally {
       signInController.setLoading(false);
     }
@@ -201,7 +203,7 @@ class FirebaseService {
           ));
       Get.to(HomePage());
     } catch (e) {
-      _showError(e);
+      showFirebaseError(e);
     }
   }
 
