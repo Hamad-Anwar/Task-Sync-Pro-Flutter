@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:get/get.dart';
 
 class UpperBody extends StatelessWidget {
   const UpperBody({super.key});
@@ -25,9 +26,9 @@ class UpperBody extends StatelessWidget {
         const SizedBox(
           height: 20,
         ),
-        const Text(
-          'Style',
-          style: TextStyle(
+        Text(
+          'task_style'.tr,
+          style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.bold,
               fontSize: 17),

@@ -28,9 +28,9 @@ class TaskBody extends StatelessWidget {
           const SizedBox(
             height: 20,
           ),
-          const Text(
-            'Category',
-            style: TextStyle(
+          Text(
+            'task_category'.tr,
+            style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
           ),
           const SizedBox(
@@ -42,16 +42,16 @@ class TaskBody extends StatelessWidget {
               focus: controller.categoryFocus.value,
               onTap: ()=>controller.setCategoryFocus(),
               onTapOutSide: ()=>controller.onTapOutside(),
-              hint: 'Pick a Category',
+              hint: 'task_category_hint'.tr,
               width: size.width,
             ),
           ),
           const SizedBox(
             height: 20,
           ),
-          const Text(
-            'Description',
-            style: TextStyle(
+          Text(
+            'task_description'.tr,
+            style: const TextStyle(
                 color: Colors.white, fontWeight: FontWeight.bold, fontSize: 17),
           ),
           const SizedBox(
@@ -62,7 +62,7 @@ class TaskBody extends StatelessWidget {
             focus: controller.descriptionFocus.value,
             onTap: ()=>controller.setDescriptionFocus(),
             onTapOutSide: ()=>controller.onTapOutside(),
-            hint: 'Enter description of your task (optional)',
+            hint: 'task_description_hint'.tr,
             width: size.width,
           ),),
           const SizedBox(
@@ -73,11 +73,11 @@ class TaskBody extends StatelessWidget {
             height: 20,
           ),
           Obx(() => AccountButton(
-            text: 'Create Task',
+            text: 'task_create_task'.tr,
             loading: controller.loading.value,
             onTap: () async {
               // controller.insertDataInDatabase();
-              controller.showProgressPicker(context);
+              controller.showStatusPicker(context);
             },
           ))
         ]),

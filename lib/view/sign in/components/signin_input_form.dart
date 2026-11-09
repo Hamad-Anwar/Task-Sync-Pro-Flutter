@@ -15,9 +15,9 @@ class SignInForm extends StatelessWidget {
         const SizedBox(
           height: 40,
         ),
-        const Text(
-          '  Email',
-          style: TextStyle(
+        Text(
+          '  ${'sign_email'.tr}',
+          style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w400,
               fontSize: 17),
@@ -28,7 +28,7 @@ class SignInForm extends StatelessWidget {
         Obx(() => InputField(
           onTap: () => controller.onFocusEmail(),
           focus: controller.emailFocus.value,
-          hint: "tim@gmail.com",
+          hint: 'sign_email_hint'.tr,
           controller: controller.email.value,
           correct: controller.correctEmail.value,
           onChange: controller.validateEmail,
@@ -36,9 +36,9 @@ class SignInForm extends StatelessWidget {
         const SizedBox(
           height: 20,
         ),
-        const Text(
-          '  Password',
-          style: TextStyle(
+        Text(
+          '  ${'sign_password'.tr}',
+          style: const TextStyle(
               color: Colors.white,
               fontWeight: FontWeight.w400,
               fontSize: 17),
@@ -50,7 +50,7 @@ class SignInForm extends StatelessWidget {
               () => InputField(
             onTap: () => controller.onFocusPassword(),
             focus: controller.passwordFocus.value,
-            hint: "Pick a strong password",
+            hint: 'sign_password_hint'.tr,
             controller: controller.password.value,
             hideText: controller.showPassword.value,
             onChange: () {

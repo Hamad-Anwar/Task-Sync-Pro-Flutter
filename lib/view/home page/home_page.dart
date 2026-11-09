@@ -3,9 +3,11 @@ import 'package:get/get.dart';
 import 'package:to_do_app/res/app_color.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:to_do_app/res/assets/app_icons.dart';
+import 'package:to_do_app/res/routes/routes.dart';
 import 'package:to_do_app/utils/utils.dart';
 import 'package:to_do_app/view%20model/controller/home_controller.dart';
-import 'package:to_do_app/view/common%20widgets/back_button.dart';
+import 'package:to_do_app/view/home%20page/components/filter_dropdowns.dart';
+import 'package:to_do_app/view/home%20page/components/language_menu.dart';
 import 'package:to_do_app/view/home%20page/components/progress_task.dart';
 import 'package:to_do_app/view/home%20page/components/search_field.dart';
 import 'package:to_do_app/view/new%20task/new_task.dart';
@@ -48,17 +50,21 @@ class HomePage extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    SvgPicture.asset(
-                      AppIcon.menu,
-                      color: Colors.white,
-                      height: 30,
-                      width: 30,
+                    GestureDetector(
+                      onTap: () => Get.toNamed(Routes.dashboardPage),
+                      behavior: HitTestBehavior.opaque,
+                      child: SvgPicture.asset(
+                        AppIcon.menu,
+                        color: Colors.white,
+                        height: 30,
+                        width: 30,
+                      ),
                     ),
                     Column(
                       children: [
                         Obx(
                           () => Text(
-                            'Hi, ${controller.name}',
+                            '${'home_hi'.tr} ${controller.name}',
                             style: const TextStyle(
                                 color: Colors.grey,
                                 fontWeight: FontWeight.bold,
@@ -74,17 +80,7 @@ class HomePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const CustomBackButton(
-                      height: 40,
-                      width: 40,
-                      radius: 40,
-                      widget: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(10.0),
-                          child: FlutterLogo(),
-                        ),
-                      ),
-                    )
+                    const LanguageMenu()
                   ],
                 ),
               ),
@@ -93,15 +89,19 @@ class HomePage extends StatelessWidget {
               ),
               SearchField(),
               const SizedBox(
-                height: 30,
+                height: 20,
+              ),
+              FilterDropdowns(),
+              const SizedBox(
+                height: 20,
               ),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
                 child: Obx(() => controller.hasData.value? RichText(
                         text: TextSpan(children: [
-                      const TextSpan(
-                        text: 'Progress  ',
-                        style: TextStyle(
+                      TextSpan(
+                        text: '${'home_your_tasks'.tr}  ',
+                        style: const TextStyle(
                             color: Colors.white,
                             fontWeight: FontWeight.w800,
                             fontSize: 16),
@@ -124,9 +124,9 @@ class HomePage extends StatelessWidget {
               ),
                Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 30),
-                child: Obx(() =>controller.hasData.value? const Text(
-                  'Tasks',
-                  style: TextStyle(
+                child: Obx(() =>controller.hasData.value? Text(
+                  'home_tasks'.tr,
+                  style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
                       fontSize: 16),
@@ -135,11 +135,24 @@ class HomePage extends StatelessWidget {
               const SizedBox(
                 height: 30,
               ),
-              Expanded(child: Obx(()=> ListView.builder(
-                itemCount: controller.list.length,
-                itemBuilder: (context, index){
-                  if(controller.list[index].show=='yes'){
-                     return Column(
+              Expanded(child: Obx(() {
+                final tasks = controller.filteredTasks;
+                if (tasks.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'home_no_tasks_found'.tr,
+                      style: const TextStyle(
+                          color: Colors.grey,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14),
+                    ),
+                  );
+                }
+                return ListView.builder(
+                  itemCount: tasks.length,
+                  itemBuilder: (context, index) {
+                    final task = tasks[index];
+                    return Column(
                       children: [
                         Container(
                           height: 70,
@@ -171,7 +184,10 @@ class HomePage extends StatelessWidget {
                                 width: 20,
                               ),
                                Text(
-                                'Create ${controller.list[index].title} for\n${controller.list[index].category}',
+                                'home_task_item'.trParams({
+                                  'title': '${task.title}',
+                                  'category': '${task.category}',
+                                }),
                                 style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 14,
@@ -190,11 +206,9 @@ class HomePage extends StatelessWidget {
                         ),
                       ],
                     );
-                  }else{
-                    return const SizedBox();
-                  }
-                },
-              )))
+                  },
+                );
+              }))
             ],
           ),
         ));

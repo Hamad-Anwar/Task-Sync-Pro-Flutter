@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:to_do_app/res/routes/routes.dart';
 import 'package:to_do_app/view%20model/controller/signup_controller.dart';
-import 'package:to_do_app/view/sign%20in/sign_in.dart';
 import 'package:to_do_app/view/sign%20up/components/signup_options.dart';
 
 import 'appbar.dart';
@@ -29,9 +28,9 @@ class SignupBody extends StatelessWidget {
             const SizedBox(
               height: 50,
             ),
-            const Text(
-              'Sign up with one of the following options.',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              'sign_up_options'.tr,
+              style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(
               height: 20,
@@ -40,7 +39,7 @@ class SignupBody extends StatelessWidget {
             InputForm(),
             Obx(
               () => AccountButton(
-                text: "Create Account",
+                text: 'sign_create_account'.tr,
                 loading: controller.loading.value,
                 onTap: () {
                   controller.createAccount();
@@ -55,15 +54,15 @@ class SignupBody extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => Get.toNamed(Routes.signInScreen),
                   child: RichText(
-                      text: const TextSpan(children: [
+                      text: TextSpan(children: [
                     TextSpan(
-                        text: 'Already have an account? ',
-                        style: TextStyle(
+                        text: '${'sign_have_account'.tr} ',
+                        style: const TextStyle(
                           color: Colors.grey,
                         )),
                     TextSpan(
-                        text: 'Login',
-                        style: TextStyle(
+                        text: 'sign_login'.tr,
+                        style: const TextStyle(
                           color: Colors.white,
                         ))
                   ])),

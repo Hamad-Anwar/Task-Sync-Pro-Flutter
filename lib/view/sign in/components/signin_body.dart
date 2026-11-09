@@ -25,9 +25,9 @@ class SignInBody extends StatelessWidget {
             const SizedBox(
               height: 50,
             ),
-            const Text(
-              'Sign in with one of the following options.',
-              style: TextStyle(color: Colors.grey),
+            Text(
+              'sign_in_options'.tr,
+              style: const TextStyle(color: Colors.grey),
             ),
             const SizedBox(
               height: 20,
@@ -36,7 +36,7 @@ class SignInBody extends StatelessWidget {
             SignInForm(),
             Obx(
               () => AccountButton(
-                text: "Login Account",
+                text: 'sign_login_account'.tr,
                 loading: controller.loading.value,
                 onTap: () {
                   controller.loginAccount();
@@ -51,15 +51,15 @@ class SignInBody extends StatelessWidget {
                 child: GestureDetector(
                   onTap: () => Get.toNamed(Routes.signUpScreen),
                   child: RichText(
-                      text: const TextSpan(children: [
+                      text: TextSpan(children: [
                     TextSpan(
-                        text: 'Don\'t have an account? ',
-                        style: TextStyle(
+                        text: '${'sign_no_account'.tr} ',
+                        style: const TextStyle(
                           color: Colors.grey,
                         )),
                     TextSpan(
-                        text: 'Sign up',
-                        style: TextStyle(
+                        text: 'sign_sign_up'.tr,
+                        style: const TextStyle(
                           color: Colors.white,
                         ))
                   ])),

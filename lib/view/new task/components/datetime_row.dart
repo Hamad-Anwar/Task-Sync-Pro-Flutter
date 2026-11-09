@@ -14,9 +14,9 @@ class DateTimeRow extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Date',
-              style: TextStyle(
+            Text(
+              'task_date'.tr,
+              style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 17),
@@ -24,7 +24,7 @@ class DateTimeRow extends StatelessWidget {
             const SizedBox(
               height: 10,
             ),
-            Obx(() => DateTimeContainer(text: controller.date.value.isEmpty? 'dd/mm/yyyy' : controller.date.value, icon: const Icon(
+            Obx(() => DateTimeContainer(text: controller.date.value.isEmpty? 'task_date_placeholder'.tr : controller.date.value, icon: const Icon(
               FontAwesomeIcons.calendar,
               color: Colors.white24,
               size: 20,
@@ -37,24 +37,24 @@ class DateTimeRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             RichText(
-                text: const TextSpan(children: [
+                text: TextSpan(children: [
                   TextSpan(
-                    text: 'Time',
-                    style: TextStyle(
+                    text: 'task_time'.tr,
+                    style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                         fontSize: 17),
                   ),
                   TextSpan(
-                    text: '   (optional)',
-                    style: TextStyle(color: Colors.white30, fontSize: 13),
+                    text: '   ${'task_optional'.tr}',
+                    style: const TextStyle(color: Colors.white30, fontSize: 13),
                   )
                 ])),
             const SizedBox(
               height: 10,
             ),
 
-            Obx(() => DateTimeContainer(text:controller.time.value.isEmpty?  'hh/mm' : controller.time.value, icon: const Icon(
+            Obx(() => DateTimeContainer(text:controller.time.value.isEmpty?  'task_time_placeholder'.tr : controller.time.value, icon: const Icon(
               Icons.watch,
               color: Colors.white24,
               size: 20,

@@ -1,5 +1,6 @@
 import 'package:get/get.dart';
 import 'package:to_do_app/res/routes/routes.dart';
+import 'package:to_do_app/view/dashboard/dashboard_page.dart';
 import 'package:to_do_app/view/home%20page/home_page.dart';
 import 'package:to_do_app/view/sign%20in/sign_in.dart';
 import 'package:to_do_app/view/sign%20up/sign_up.dart';
@@ -12,6 +13,7 @@ class AppRoutes{
       GetPage(name: Routes.signUpScreen, page: ()=>const SignUp()),
       GetPage(name: Routes.signInScreen, page: ()=>const SignIn()),
       GetPage(name: Routes.homePage, page: ()=> HomePage()),
+      GetPage(name: Routes.dashboardPage, page: ()=> DashboardPage()),
     ];
   }
 }

@@ -31,11 +31,14 @@ class Utils{
    );
   }
   static String formateDate(DateTime date){
-    String formattedDate = DateFormat('d MMM y').format(date);
+    // Formato de ARMAZENAMENTO da task — fixo em en_US, independente do locale.
+    String formattedDate = DateFormat('d MMM y', 'en_US').format(date);
     return formattedDate;
   }
   static String formatDate(){
-    String formattedDate = DateFormat('EEEE, d').format(DateTime.now());
+    // Só exibição (header) — segue o locale atual do app.
+    String formattedDate =
+        DateFormat('EEEE, d', Get.locale?.toString()).format(DateTime.now());
     return formattedDate;
   }
   static Map<int,String> getImage(){
@@ -46,7 +49,8 @@ class Utils{
     };
   }
   static String getDaysDiffirece(String dateString){
-    DateFormat dateFormat = DateFormat('dd MMM yyyy');
+    // Parse do formato de ARMAZENAMENTO — fixo em en_US.
+    DateFormat dateFormat = DateFormat('dd MMM yyyy', 'en_US');
     DateTime date = dateFormat.parse(dateString);
     DateTime now = DateTime.now();
     Duration difference = now.difference(date);
@@ -60,17 +64,17 @@ class Utils{
       context: context,
       builder: (context) {
         return AlertDialog(
-          title: const Text('Remove Task'),
-          content: const Text('Are you sure you want to delete this Task?'),
+          title: Text('task_remove_task'.tr),
+          content: Text('task_remove_confirm'.tr),
           actions: [
             TextButton(
-              child: const Text('Cancel'),
+              child: Text('task_cancel'.tr),
               onPressed: () {
                 Navigator.of(context).pop();
               },
             ),
             TextButton(
-              child: const Text('Remove'),
+              child: Text('task_remove'.tr),
               onPressed: () {
                 onConfirm();
                 Navigator.pop(context);

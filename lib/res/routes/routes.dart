@@ -3,4 +3,5 @@ class Routes{
   static const signUpScreen='/signUpScreen';
   static const signInScreen='/signInScreen';
   static const homePage='/homePage';
+  static const dashboardPage='/dashboardPage';
 }

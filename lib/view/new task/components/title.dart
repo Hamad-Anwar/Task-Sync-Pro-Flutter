@@ -15,9 +15,9 @@ class TitlePeriority extends StatelessWidget {
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Title',
-              style: TextStyle(
+            Text(
+              'task_title'.tr,
+              style: const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,
                   fontSize: 17),
@@ -31,8 +31,8 @@ class TitlePeriority extends StatelessWidget {
                 focus: controller.titleFocus.value,
                 onTap: ()=>controller.setTitleFocus(),
                 onTapOutSide: ()=> controller.onTapOutside(),
-                hint: 'Enter task title',
-                width: size.width / 2.2,
+                hint: 'task_title_hint'.tr,
+                width: size.width / 2.6,
               ),
             )
           ],
@@ -40,31 +40,40 @@ class TitlePeriority extends StatelessWidget {
         const SizedBox(
           width: 10,
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Periority',
-              style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 17),
-            ),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Obx(
-                  () => PeriorityContainer(
-                      onTap: ()=> controller.setPeriority(true), focus: controller.lowPeriority.value, type: "Low"),
-                ),
-                const SizedBox(
-                  width: 10,
-                ),
-                Obx(()=> PeriorityContainer(onTap: ()=>controller.setPeriority(false), focus: !controller.lowPeriority.value, type: "High")),
-              ],
-            ),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'task_priority'.tr,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 17),
+              ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  for (final level in const ['Low', 'Medium', 'High']) ...[
+                    if (level != 'Low')
+                      const SizedBox(
+                        width: 6,
+                      ),
+                    Expanded(
+                      child: Obx(
+                        () => PeriorityContainer(
+                            onTap: () => controller.setPeriority(level),
+                            focus: controller.periority.value == level,
+                            type: level,
+                            width: null,
+                            fontSize: 12),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         )
       ],
     );

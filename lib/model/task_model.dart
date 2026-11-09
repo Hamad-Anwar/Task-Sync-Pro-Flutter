@@ -13,6 +13,10 @@ class TaskModel {
   String? progress;
   String? status;
 
+  /// Instante (ms desde a época, como texto) da última alteração feita no app.
+  /// Decide conflitos entre aparelhos: a versão mais nova vence.
+  String? updatedAt;
+
   TaskModel(
       {required this.key,
       required this.time,
@@ -24,7 +28,8 @@ class TaskModel {
       required this.image,
       required this.show,
       required this.progress,
-      required this.status});
+      required this.status,
+      this.updatedAt});
 
   TaskModel.fromMap(Map<String, dynamic> res) {
     key = res['key'];
@@ -36,8 +41,20 @@ class TaskModel {
     show = res['show'];
     time = res['time'];
     date = res['date'];
-    progress=res['progress'];
-    status=res['status'];
+    progress = res['progress'];
+    status = res['status'];
+    updatedAt = res['updatedAt']?.toString();
+  }
+
+  /// [updatedAt] como número; tasks antigas (sem o campo) valem 0.
+  int get updatedAtMillis => int.tryParse(updatedAt ?? '') ?? 0;
+
+  /// Lê o `updatedAt` de um valor cru do Firebase (Map) ou 0 se não houver.
+  static int updatedAtOf(Object? remoteValue) {
+    if (remoteValue is Map) {
+      return int.tryParse(remoteValue['updatedAt']?.toString() ?? '') ?? 0;
+    }
+    return 0;
   }
 
   Map<String, Object?> toMap() {
@@ -51,8 +68,9 @@ class TaskModel {
       'time': time,
       'date': date,
       'show': show,
-      'status' : status,
-      'progress' : progress,
+      'status': status,
+      'progress': progress,
+      'updatedAt': updatedAt,
     };
   }
 }

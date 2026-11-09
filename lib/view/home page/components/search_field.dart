@@ -56,7 +56,7 @@ class SearchField extends StatelessWidget {
           hoverColor: Colors.pinkAccent,
           contentPadding:
           const EdgeInsets.symmetric(horizontal: 30, vertical: 20),
-          hintText: 'Search ...',
+          hintText: 'home_search_hint'.tr,
           hintStyle: const TextStyle(
               color: Colors.grey, fontWeight: FontWeight.normal, fontSize: 12),
         ),
